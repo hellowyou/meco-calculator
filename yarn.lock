@@ -2583,6 +2583,10 @@ extend@~3.0.1:
   version "3.0.1"
   resolved "https://registry.yarnpkg.com/extend/-/extend-3.0.1.tgz#a755ea7bc1adfcc5a31ce7e762dbaadc5e636444"
 
+extensible-duck@^1.4.0:
+  version "1.4.0"
+  resolved "https://registry.yarnpkg.com/extensible-duck/-/extensible-duck-1.4.0.tgz#ac7218f0e9f8691ce50ccdf88e6906d96b6daae1"
+
 external-editor@^2.0.4:
   version "2.2.0"
   resolved "https://registry.yarnpkg.com/external-editor/-/external-editor-2.2.0.tgz#045511cfd8d133f3846673d1047c154e214ad3d5"

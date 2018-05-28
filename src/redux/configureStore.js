@@ -1,6 +1,9 @@
 import { createStore, combineReducers } from 'redux';
+import formulaDuck from './modules/formulas';
 
-const reducer = combineReducers({});
+const reducer = combineReducers({
+	[formulaDuck.store]: formulaDuck.reducer,
+});
 
 const configureStore = (initialState) => createStore(
     reducer,

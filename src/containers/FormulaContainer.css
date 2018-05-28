@@ -1,0 +1,26 @@
+* { box-sizing: border-box; }
+
+.FormulaItems { list-style-type: none; }
+
+.FormulaItem .error {
+	border: 1px solid red;
+}
+
+.FormulaItemFormula input, .FormulaItemName input {
+	width: 100%;
+	padding: .5em;
+}
+
+.FormulaItem, .FormulaItemsFooter {
+  display: grid;
+  grid-template-columns: 45% 45% auto;
+  grid-column-gap: 1em;
+}
+
+.FormulaItemsFooter .GrandTotal, .FormulaItemsFooter .GrandTotalAmount {
+	text-align: right;
+	font-weight: 600;
+	font-size: 2em;
+}
+
+.error-message { color: red; }

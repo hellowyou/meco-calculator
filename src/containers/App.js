@@ -4,9 +4,12 @@ import FormulaContainer from './FormulaContainer';
 
 class App extends Component {
   render() {
+  	const formulaVars = {
+  		READING_DIFF: 10
+  	};
     return (
       <div className="App">
-        <FormulaContainer />
+        <FormulaContainer formulaVars={formulaVars} />
       </div>
     );
   }

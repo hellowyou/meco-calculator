@@ -1,7 +1,10 @@
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import PropTypes from 'prop-types';
+import classNames from 'classnames';
+import { Parser } from 'hot-formula-parser';
 import formulaDuck from '../redux/modules/formulas';
+import './FormulaContainer.css';
 
 const mapStateToProps = (state) => ({
 	formulaItems: formulaDuck.selectors.items(state),
@@ -14,6 +17,47 @@ const mapDispatchToProps = (dispatch) => ({
 });
 
 export class FormulaContainer extends Component {
+	_parser = null;
+
+	constructor(props) {
+		super(props);
+		this.initParser();
+	}
+
+	initParser() {
+		this._parser = new Parser();
+		this._parser.on('callFunction', this._handleFuncDefs.bind(this));
+	}
+
+	_handleFuncDefs(name, params, done) {
+		if(name.toLowerCase() === 'item') {
+			let itemNumber = params[0];
+			// console.log(this.props.formulaItems, itemNumber);
+			this.props.formulaItems[itemNumber - 1] !== void 0
+				? done(this.props.formulaItems[itemNumber - 1].value)
+				: done(new Error('#VALUE!'));
+		}
+		// console.log({name, params, done});
+	}
+
+	_getErrorMessage(err) {
+		return {
+			'#ERROR!'	: 'Error',
+			'#DIV/0!'	: 'Cannot divide by zero',
+			'#NAME?'	: 'Undefined function or variable',
+			'#N/A'		: 'Value is not avaiable to a formula',
+			'#NUM!'		: 'Invalid Number',
+			'#VALUE!'	: 'Invalid argument type',
+		}[err] || null;
+	}
+
+	componentWillReceiveProps(props) {
+		if(props.hasOwnProperty('formulaVars')) {
+			for(let key in props.formulaVars) {
+				this._parser.setVariable(key, props.formulaVars[key]);
+			}
+		}
+	}
 
 	addFormulaItem(e) {
 		let formulaItem = {
@@ -22,6 +66,7 @@ export class FormulaContainer extends Component {
 			formula: '',
 			value: 0,
 			error: null,
+			errorMsg: null,
 		};
 
 		this.props.addFormulaItem(formulaItem);
@@ -31,19 +76,64 @@ export class FormulaContainer extends Component {
 		const { name, value } = e.target;
 
 		if(formulaItem.hasOwnProperty(name)) {
-			formulaItem[name] = value;
+			formulaItem[name] = name === 'formula' ? value.toUpperCase() : value;
 			this.props.updateFormulaItem(formulaItem);
 		}
 	}
 
+	findDependents(formulaItem) {
+		let index = this.props.formulaItems.findIndex(item => item.id === formulaItem.id);
+		return this.props.formulaItems.filter((item) => {
+			let indices = [], match;
+			// Return if same as the formula item
+			if(item.id === formulaItem.id)
+				return false;
+
+			// Find all the item() functions in the formula string
+			while((match = /item\((\d+)\)/ig.exec(item.formula)) !== null) {
+				indices.push( parseInt(match[1], 10) );
+			}
+
+			return indices.indexOf(index + 1) !== -1;
+		});
+	}
+
 	removeFormulaItem(formulaItem) {
 		this.props.removeFormulaItem(formulaItem.id);
+		// May still cause an infinite loop
+		// TODO: Need to find a way to avoid self and cross referencing
+		// this.findDependents(formulaItem).map(item => this.parseFormulaItem(item));
 	}
 
-	parseFormulaItem(formulaItem) {
-		// Update the formula property using hot-parser
+	parseFormulaItem(formulaItem, count = 0) {
+		let { error, result } = this._parser.parse(formulaItem.formula);
+		let errorMsg = this._getErrorMessage(error);
+
+		if(count > 100) {
+			return;
+		}
+
+		this.props.updateFormulaItem({
+			...formulaItem,
+			value: result || formulaItem.value,
+			error,
+			errorMsg
+		});
+
+		count++;
+
+		// If there is no error message update the items
+		// that has reference to the currently parsed formula item
+		if(! errorMsg) {
+			// May still cause an infinite loop
+			// TODO: Need to find a way to avoid self and cross referencing
+			// this.findDependents(formulaItem).map(item => this.parseFormulaItem(item, count));
+			// this.findDependents(formulaItem);
+			// console.log({dependents: });
+		}
 	}
 
+	// Generate ID like autoincrement in sql
 	getNextId() {
 	 return this.props.formulaItems
 			? this.props.formulaItems.reduce((last, current) => current.id > last ? current.id : last, 0) + 1
@@ -51,28 +141,50 @@ export class FormulaContainer extends Component {
 	}
 
 	renderItem(formulaItem) {
+		let formulaClass = classNames({error: !!formulaItem.error });
+
 		return (
 			<li className="FormulaItem" key={ formulaItem.id }>
 				{/* TODO: Make a component for formula item name */}
-				<input type="text" name="name" onChange={this.updateFormulaItem.bind(this, formulaItem)} value={formulaItem.name} />
+				<div className="FormulaItemName">
+					<input type="text" name="name" onChange={this.updateFormulaItem.bind(this, formulaItem)} value={formulaItem.name} />
+				</div>
+
 				{/* TODO: Make a component for formula item formula */}
-				<input
-					type="text" name="formula" value={formulaItem.formula}
-					onChange={this.updateFormulaItem.bind(this, formulaItem)}
-					onBlur={this.parseFormulaItem.bind(this, formulaItem)} />
+				<div className="FormulaItemFormula">
+					<input
+						type="text" name="formula"
+						className={formulaClass}
+						value={formulaItem.formula}
+						onChange={this.updateFormulaItem.bind(this, formulaItem)}
+						onBlur={this.parseFormulaItem.bind(this, formulaItem)} />
+					{formulaItem.errorMsg && <span className="error-message">{formulaItem.errorMsg}</span>}
+				</div>
+
 				{/* TODO: Make a component for formula item action buttons */}
-				<button className="RemoveFormulaItemBtn" onClick={this.removeFormulaItem.bind(this, formulaItem)}>X</button>
-				{/* TODO: Make items movable*/}
+				<div className="FormulaItemButtons">
+					<button className="RemoveFormulaItemBtn" onClick={this.removeFormulaItem.bind(this, formulaItem)}>X</button>
+					{/* TODO: Make items movable*/}
 				{/*<button className="MoveFormulaItemBtn" onClick={this.removeFormulaItem.bind(this, formulaItem)}>+</button>*/}
+				</div>
 			</li>
 		);
 	}
 
 	render() {
+		const grandTotal = this.props.formulaItems.reduce((total, item) => total + item.value, 0);
 		return (
 			<div className="FormulaContainer">
-				<h1>Formulas</h1>
-				{this.props.formulaItems && <ul className="FormulaItems">{this.props.formulaItems.map(this.renderItem.bind(this))}</ul>}
+				<h1>Formula</h1>
+				{this.props.formulaItems &&
+						<ul className="FormulaItems">
+							{this.props.formulaItems.map(this.renderItem.bind(this))}
+							<li className="FormulaItemsFooter">
+								<div className="col-1 GrandTotal">Grand Total:</div>
+								<div className="col-2 GrandTotalAmount">{grandTotal}</div>
+							</li>
+						</ul>
+				}
 				<button className="AddFormulaItemBtn" onClick={this.addFormulaItem.bind(this)}>Add Formula Item</button>
 			</div>
 		);
@@ -87,6 +199,7 @@ FormulaContainer.propTypes = {
 			formula: PropTypes.string.isRequired,
 			value: PropTypes.number.isRequired,
 			error: PropTypes.string,
+			errorMsg: PropTypes.string,
 		}).isRequired
 	).isRequired,
 	addFormulaItem: PropTypes.func.isRequired,

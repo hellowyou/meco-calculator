@@ -5,9 +5,9 @@ describe('Formula Module', () => {
 
 	function setup() {
 		const formulaItems = [
-			{ id: 1, name: 'General', formula: '1 + 1', value: 2, error: null, },
-			{ id: 2, name: 'Geniricic', formula: '1 + 2', value: 3, error: null, },
-			{ id: 3, name: 'Another Name', formula: '2 + 2', value: 4, error: null, },
+			{ id: 1, name: 'General', formula: '1 + 1', value: 2, error: null, errorMsg: null },
+			{ id: 2, name: 'Geniricic', formula: '1 + 2', value: 3, error: null, , errorMsg: null },
+			{ id: 3, name: 'Another Name', formula: '2 + 2', value: 4, error: null, , errorMsg: null },
 		];
 
 		const initialState = formulaModule.initialState;

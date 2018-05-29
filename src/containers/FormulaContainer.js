@@ -2,9 +2,9 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import PropTypes from 'prop-types';
 import classNames from 'classnames';
-import { Parser } from 'hot-formula-parser';
 import formulaDuck from '../redux/modules/formulas';
 import './FormulaContainer.css';
+import Parser from '../lib/parser';
 
 const mapStateToProps = (state) => ({
 	formulaItems: formulaDuck.selectors.items(state),
@@ -25,7 +25,9 @@ export class FormulaContainer extends Component {
 	}
 
 	initParser() {
+		// console.log(new Parser, new OwnParser);
 		this._parser = new Parser();
+		console.log(this._parser);
 		this._parser.on('callFunction', this._handleFuncDefs.bind(this));
 	}
 
@@ -83,15 +85,27 @@ export class FormulaContainer extends Component {
 
 	findDependents(formulaItem) {
 		let index = this.props.formulaItems.findIndex(item => item.id === formulaItem.id);
+		console.log(`finding dependents for formula item with id of ${formulaItem.id}`);
 		return this.props.formulaItems.filter((item) => {
-			let indices = [], match;
-			// Return if same as the formula item
-			if(item.id === formulaItem.id)
-				return false;
+			let indices = [], match, x = 0, re = /item\((\d+)\)/ig;
 
+			console.log({itemFormula: item.formula, formulaItemPassedIndex: index, re, reLastIndex: re.lastIndex + 0});
+
+			// Return if same as the formula item
+			if(item.id === formulaItem.id) {
+				console.log('Returning, same ID');
+				return false;
+			}
 			// Find all the item() functions in the formula string
-			while((match = /item\((\d+)\)/ig.exec(item.formula)) !== null) {
+			while((match = re.exec(item.formula)) !== null) {
+				if(x > 100) {
+					console.log(`Broke when finding dependents for formula item with id of ${formulaItem.id}`);
+					break;
+				}
+
+				console.log({match});
 				indices.push( parseInt(match[1], 10) );
+				x++;
 			}
 
 			return indices.indexOf(index + 1) !== -1;
@@ -106,16 +120,16 @@ export class FormulaContainer extends Component {
 	}
 
 	parseFormulaItem(formulaItem, count = 0) {
-		let { error, result } = this._parser.parse(formulaItem.formula);
-		let errorMsg = this._getErrorMessage(error);
+		let { error, result, errorMsg } = this._parser.parse(formulaItem.formula);
 
 		if(count > 100) {
+			console.error('Max call stack has been reached');
 			return;
 		}
 
 		this.props.updateFormulaItem({
 			...formulaItem,
-			value: result || formulaItem.value,
+			value: result,
 			error,
 			errorMsg
 		});
@@ -127,7 +141,7 @@ export class FormulaContainer extends Component {
 		if(! errorMsg) {
 			// May still cause an infinite loop
 			// TODO: Need to find a way to avoid self and cross referencing
-			// this.findDependents(formulaItem).map(item => this.parseFormulaItem(item, count));
+			this.findDependents(formulaItem).map(item => this.parseFormulaItem(item, count));
 			// this.findDependents(formulaItem);
 			// console.log({dependents: });
 		}

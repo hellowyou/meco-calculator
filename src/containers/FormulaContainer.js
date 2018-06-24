@@ -6,6 +6,7 @@ import formulaDuck from '../redux/modules/formulas';
 import './FormulaContainer.css';
 import Parser from '../lib/parser';
 
+
 const mapStateToProps = (state) => ({
 	formulaItems: formulaDuck.selectors.items(state),
 });
@@ -25,32 +26,12 @@ export class FormulaContainer extends Component {
 	}
 
 	initParser() {
-		// console.log(new Parser, new OwnParser);
 		this._parser = new Parser();
-		console.log(this._parser);
-		this._parser.on('callFunction', this._handleFuncDefs.bind(this));
+		this._parser.on('callItems', this._handleCallItems.bind(this));
 	}
 
-	_handleFuncDefs(name, params, done) {
-		if(name.toLowerCase() === 'item') {
-			let itemNumber = params[0];
-			// console.log(this.props.formulaItems, itemNumber);
-			this.props.formulaItems[itemNumber - 1] !== void 0
-				? done(this.props.formulaItems[itemNumber - 1].value)
-				: done(new Error('#VALUE!'));
-		}
-		// console.log({name, params, done});
-	}
-
-	_getErrorMessage(err) {
-		return {
-			'#ERROR!'	: 'Error',
-			'#DIV/0!'	: 'Cannot divide by zero',
-			'#NAME?'	: 'Undefined function or variable',
-			'#N/A'		: 'Value is not avaiable to a formula',
-			'#NUM!'		: 'Invalid Number',
-			'#VALUE!'	: 'Invalid argument type',
-		}[err] || null;
+	_handleCallItems(done) {
+		done(this.props.formulaItems);
 	}
 
 	componentWillReceiveProps(props) {
@@ -85,30 +66,25 @@ export class FormulaContainer extends Component {
 
 	findDependents(formulaItem) {
 		let index = this.props.formulaItems.findIndex(item => item.id === formulaItem.id);
-		console.log(`finding dependents for formula item with id of ${formulaItem.id}`);
+
 		return this.props.formulaItems.filter((item) => {
 			let indices = [], match, x = 0, re = /item\((\d+)\)/ig;
 
-			console.log({itemFormula: item.formula, formulaItemPassedIndex: index, re, reLastIndex: re.lastIndex + 0});
-
 			// Return if same as the formula item
 			if(item.id === formulaItem.id) {
-				console.log('Returning, same ID');
 				return false;
 			}
 			// Find all the item() functions in the formula string
 			while((match = re.exec(item.formula)) !== null) {
 				if(x > 100) {
-					console.log(`Broke when finding dependents for formula item with id of ${formulaItem.id}`);
 					break;
 				}
 
-				console.log({match});
 				indices.push( parseInt(match[1], 10) );
 				x++;
 			}
 
-			return indices.indexOf(index + 1) !== -1;
+			return indices.indexOf(index) !== -1;
 		});
 	}
 
@@ -119,30 +95,23 @@ export class FormulaContainer extends Component {
 		// this.findDependents(formulaItem).map(item => this.parseFormulaItem(item));
 	}
 
-	parseFormulaItem(formulaItem, count = 0) {
+	parseFormulaItem(formulaItem) {
 		let { error, result, errorMsg } = this._parser.parse(formulaItem.formula);
-
-		if(count > 100) {
-			console.error('Max call stack has been reached');
-			return;
-		}
 
 		this.props.updateFormulaItem({
 			...formulaItem,
 			value: result,
 			error,
-			errorMsg
+			errorMsg,
 		});
-
-		count++;
 
 		// If there is no error message update the items
 		// that has reference to the currently parsed formula item
 		if(! errorMsg) {
 			// May still cause an infinite loop
 			// TODO: Need to find a way to avoid self and cross referencing
-			this.findDependents(formulaItem).map(item => this.parseFormulaItem(item, count));
-			// this.findDependents(formulaItem);
+			// this.findDependents(formulaItem).map(item => this.parseFormulaItem(item, count));
+			console.log( this.findDependents(formulaItem) );
 			// console.log({dependents: });
 		}
 	}
@@ -150,7 +119,9 @@ export class FormulaContainer extends Component {
 	// Generate ID like autoincrement in sql
 	getNextId() {
 	 return this.props.formulaItems
-			? this.props.formulaItems.reduce((last, current) => current.id > last ? current.id : last, 0) + 1
+			? this.props.formulaItems.reduce(
+					(last, current) => current.id > last ? current.id : last, 0
+				) + 1
 			: 1;
 	}
 
